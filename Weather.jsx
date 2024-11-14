@@ -2,21 +2,21 @@ import { css } from 'uebersicht'
 
 /***********************Options***********************/
 // Open Weather API Key https://openweathermap.org/api
-const KEY = ''
-const LANG = 'zh' // language: en for English, zh for Chinese
+const KEY = 'YOUR_API_KEY'
+const LANG = 'ca' // language: en for English, zh for Chinese
 // weather data units
 // standard(default), metric and imperial units are available.
 const UNITS = 'metric'
 // theme: light or dark
 const theme = 'dark'
 // background transparency. value from 0 to 1
-const backgroundTransparency = 0.75
+const backgroundTransparency = 0
 // widget position
 const POSITION = {
-  x: 'right', // x is left or right
+  x: 'left', // x is left or right
   y: 'top', // y is top or bottom
-  marginX: 20,
-  marginY: 20
+  marginX: 54,
+  marginY: 24
 }
 /***********************Options***********************/
 
@@ -42,18 +42,22 @@ export const refreshFrequency = 30 * 60 * 1000 // ms, every 30 minutes
 export const initialState = {
   loading: true,
   data: null,
-  city: '',
+  data2: null,
+  data3: null,
+  city: 'Sant Antonio de Vilamayor',
   showMore: false
 }
 
 const WEEK_DAY = {
-  en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
+  ca: ['Dmnge', 'Dllns', 'Dmrts', 'Dim', 'Dij', 'Div', 'Dssbte'],
   zh: ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 }
+
 const TEXT = {
-  today: { en: 'Today', zh: '今天' },
-  feelsLike: { en: 'Feels like: ', zh: '体感温度：' }
+  today: { ca: 'Avui', zh: '今天' },
+  feelsLike: { ca: 'Sensació: ', zh: '体感温度：' }
 }
+
 const ICON = {
   light: {
     Clear:
@@ -101,7 +105,7 @@ const ICON = {
   }
 }
 
-export const command = (dispatch) => {
+/*export const command = (dispatch) => {
   geolocation.getCurrentPosition(
     (geo) => {
       console.log('🚀 ~ command ~ geo', geo)
@@ -118,7 +122,8 @@ export const command = (dispatch) => {
       const lon = geo.position.coords.longitude
       const proxy = 'http://127.0.0.1:41417'
       const server = 'https://api.openweathermap.org'
-      const path = `/data/2.5/onecall?lat=${lat}&lon=${lon}&exclude=minutely&appid=${KEY}&units=${UNITS}&lang=${LANG}`
+      const path = `/data/2.5/weather?lat=${lat}&lon=${lon}&exclude=minutely&appid=${KEY}&units=${UNITS}&lang=${LANG}`
+      const path2 = `/data/2.5/forecast?lat=${lat}&lon=${lon}&exclude=minutely&appid=${KEY}&units=${UNITS}&lang=${LANG}`
       fetch(`${proxy}/${server}${path}`)
         .then((response) => {
           return response.json()
@@ -127,18 +132,68 @@ export const command = (dispatch) => {
           return dispatch({ type: 'FETCH_FAILED', error: error })
         })
         .then((data) => {
+          console.log('data:' ,data)
           return dispatch({
             type: 'FETCH_SUCCEDED',
             data: data,
             city: address
           })
         })
+      
+      fetch(`${proxy}/${server}${path2}`)
+        .then((response) => {
+          return response.json()
+          })
+        .catch((error) => {
+          return dispatch({ type: 'FETCH_FAILED', error: error })
+          })
+        .then((data) => {
+          console.log('data2:', data)
+          return dispatch({
+            type: 'FETCH_SUCCEDED',
+            data2: data,
+          })
+        })
+      
     },
     (error) => {
       return dispatch({ type: 'GEO_FAILED', error: error })
     }
   )
-}
+}*/
+
+export const command = async (dispatch) => {
+  try {
+    const geo = await new Promise((resolve, reject) => {
+      geolocation.getCurrentPosition(resolve, reject);
+    });
+
+    const { country, state, city } = geo.address;
+    const address = city !== '(null)' ? city : state !== '(null)' ? state : country;
+    const lat = geo.position.coords.latitude;
+    const lon = geo.position.coords.longitude;
+    const server = 'https://api.openweathermap.org';
+    const path = `/data/2.5/weather?lat=${lat}&lon=${lon}&exclude=minutely&appid=${KEY}&units=${UNITS}&lang=${LANG}`;
+    const path2 = `/data/2.5/forecast?lat=${lat}&lon=${lon}&cnt=4&appid=${KEY}&units=${UNITS}&lang=${LANG}`;
+    const path3 = `/data/2.5/forecast?lat=${lat}&lon=${lon}&exclude=minutely&appid=${KEY}&units=${UNITS}&lang=${LANG}`;
+
+    const [data, data2, data3] = await Promise.all([
+      fetch(`${server}${path}`).then(response => response.json()),
+      fetch(`${server}${path2}`).then(response => response.json()),
+      fetch(`${server}${path3}`).then(response => response.json())
+    ]);
+
+    dispatch({
+      type: 'FETCH_SUCCEDED',
+      data: data,
+      data2: data2,
+      data3: data3,
+      city: address
+    });
+  } catch (error) {
+    dispatch({ type: 'FETCH_FAILED', error: error });
+  }
+};
 
 export const updateState = (event, previousState) => {
   if (event.error) {
@@ -147,8 +202,8 @@ export const updateState = (event, previousState) => {
 
   switch (event.type) {
     case 'FETCH_SUCCEDED':
-      const { data, city, loading } = event
-      return { ...previousState, loading, data, city }
+      const { data, data2, data3, city } = event
+      return { ...previousState, loading: false, data, data2, data3, city }
     case 'SHOW_MORE':
     case 'HIDE_MORE':
       const { showMore } = event
@@ -158,7 +213,10 @@ export const updateState = (event, previousState) => {
   }
 }
 
-export const render = ({ loading, data, city, showMore, error }, dispatch) => {
+export const render = ({ loading, data, data2, data3, city, showMore, error }, dispatch) => {
+  console.log('data:' ,data)
+  console.log('data2:' ,data2)
+  console.log('data3:' ,data3)
   return error ? (
     <div className={errorWrapper}>
       Something went wrong: <strong>{String(error)}</strong>
@@ -166,40 +224,40 @@ export const render = ({ loading, data, city, showMore, error }, dispatch) => {
   ) : (
     <div>
       {loading || !data ? (
-        <div className={errorWrapper}>Loading...</div>
+        <div className={errorWrapper}>Loading....!</div>
       ) : (
         <div className={wrapper}>
           <div className={header}>
             <p className={info}>{city}</p>
             <p className={info}>
               {TEXT.feelsLike[LANG]}
-              {data.current.feels_like.toFixed(1)}°
+              {data.main.feels_like.toFixed(1)}°
             </p>
             <div className={brief}>
-              <div className={temperature}>{data.current.temp.toFixed(1)}°</div>
+              <div className={temperature}>{data.main.temp.toFixed(1)}°</div>
               <img
-                src={ICON[theme][data.current.weather[0].main] || ICON[theme]['Clear']}
-                alt={data.current.weather[0].main}
+                src={ICON[theme][data.weather[0].main] || ICON[theme]['Clear']}
+                alt={data.weather[0].main}
               />
             </div>
           </div>
 
           <div className={hourly}>
-            {data.hourly.map((hourData, index) => {
-              const date = new Date(hourData.dt * 1000)
-              const hour = date.getHours()
-              return index < 6 ? (
-                <div key={hourData.dt} className={everyHour}>
-                  <p className={everyHourTime}>{hour}</p>
-                  <p className={everyHourTemp}>{hourData.temp.toFixed(1)}</p>
+            {data2 && data2.list && data2.list.map((hourData, index) => {
+              const date = new Date(hourData.dt * 1000);
+              const hour = date.getHours();
+              return index < 4 ? (
+                <div key={index} className={everyHour}>
+                  <span className={everyHourTime}>{hour}</span>
+                  <span className={everyHourTemp}>{hourData.main.temp.toFixed(1)}</span>
                   <img
                     className={everyHourIcon}
                     src={ICON[theme][hourData.weather[0].main] || ICON[theme]['Clear']}
                     alt={hourData.weather[0].main}
                   />
-                  <p className={everyHourProb}>{(hourData.pop * 100).toFixed(0)}%</p>
-                </div>
-              ) : null
+                  <span className={everyHourProb}>{(hourData.pop * 100).toFixed(0)}%</span>
+                </div>                
+              ) : null;
             })}
           </div>
 
@@ -217,10 +275,11 @@ export const render = ({ loading, data, city, showMore, error }, dispatch) => {
 
           {showMore && (
             <div className={daily}>
-              {data.daily.map((data, index) => {
+              {data3 && data3.list && data3.list.map((data, index) => {
                 const date = new Date(data.dt * 1000)
                 const weekDay = date.getDay()
-                return index < 7 ? (
+                
+                return index % 8 === 0 ? (
                   <div key={data.dt} className={everyDay}>
                     <div className={everyDayInfo}>
                       <div className={everyDayInfo}>
@@ -232,13 +291,14 @@ export const render = ({ loading, data, city, showMore, error }, dispatch) => {
                         />
                       </div>
                       <div className={everyDayInfo}>
-                        <p className={everyDayTempLow}>{data.temp.min.toFixed(0)}</p>
-                        <p className={everyDayTempHigh}>{data.temp.max.toFixed(0)}</p>
+                        <p className={everyDayTempLow}>{data.main.temp_min.toFixed(0)}</p>
+                        <p className={everyDayTempHigh}>{data.main.temp_max.toFixed(0)}</p>
                       </div>
                     </div>
                     <p className={everyDaySummary}>{data.weather[0].description}</p>
                   </div>
                 ) : null
+              
               })}
             </div>
           )}
@@ -270,7 +330,7 @@ export const className = `
 
 const errorWrapper = css`
   font-family: Montserrat, sans-serif;
-  width: 240px;
+  width: 280px;
   background-color: ${backgroundColor};
   padding: 24px;
   border-radius: 10px;
@@ -279,7 +339,7 @@ const errorWrapper = css`
 
 const wrapper = css`
   font-family: Montserrat, sans-serif;
-  width: 240px;
+  width: 280px;
   background-color: ${backgroundColor};
   padding: 24px 24px 0 24px;
   border-radius: 10px;
